@@ -7,12 +7,15 @@ import { RootState } from '../../redux/store';
 import { getGlobalStyles } from '@/styles/globalStyles';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { setNotificationsEnabled, setNotifyDayBefore, setNotifyHourBefore } from '@/redux/notificationSettingsSlice';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [notifyHourBefore, setNotifyHourBefore] = useState(false);
-  const [notifyDayBefore, setNotifyDayBefore] = useState(false);
+  const notificationsEnabled = useSelector((state: RootState) => state.notificationSettings.notificationsEnabled);
+  const notifyHourBefore = useSelector((state: RootState) => state.notificationSettings.notifyHourBefore);
+  const notifyDayBefore = useSelector((state: RootState) => state.notificationSettings.notifyDayBefore);
+
+  const dispatch = useDispatch();
 
   const theme = useColorScheme() ?? 'light';
   const styles = getGlobalStyles(theme).settings;
@@ -30,8 +33,9 @@ export default function SettingsScreen() {
         <Text style={styles.optionLabel}>Powiadomienia</Text>
         <Switch
           value={notificationsEnabled}
-          onValueChange={setNotificationsEnabled}
+          onValueChange={(val) => { dispatch(setNotificationsEnabled(val)); }}
         />
+
       </View>
 
       {/* Sekcja szczegółowych ustawień powiadomień */}
@@ -43,7 +47,7 @@ export default function SettingsScreen() {
             <Text style={styles.optionLabel}>Godzinę przed deadlinem</Text>
             <Switch
               value={notifyHourBefore}
-              onValueChange={setNotifyHourBefore}
+              onValueChange={(val) => { dispatch(setNotifyHourBefore(val)); }}
             />
           </View>
 
@@ -51,7 +55,7 @@ export default function SettingsScreen() {
             <Text style={styles.optionLabel}>Dzień przed deadlinem</Text>
             <Switch
               value={notifyDayBefore}
-              onValueChange={setNotifyDayBefore}
+              onValueChange={(val) => { dispatch(setNotifyDayBefore(val)); }}
             />
           </View>
         </View>
@@ -59,16 +63,16 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <TouchableOpacity style={styles.optionButton} onPress={handleArchivePress}>
-                <Text style={styles.optionLabel}>📁 Archiwum zadań</Text>
-              </TouchableOpacity>
+          <Text style={styles.optionLabel}>📁 Archiwum zadań</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Inne</Text>
         <TouchableOpacity style={styles.optionButton}>
-                <Text style={styles.optionLabel}>🔁 Resetuj dane (wkrótce) </Text>
-              </TouchableOpacity>
-        
+          <Text style={styles.optionLabel}>🔁 Resetuj dane (wkrótce) </Text>
+        </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   );

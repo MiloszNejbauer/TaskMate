@@ -10,6 +10,8 @@ import {
   REGISTER,
   REHYDRATE,
 } from 'redux-persist';
+import notificationSettingsReducer from './notificationSettingsSlice';
+
 
 const persistConfig = {
   key: 'root',
@@ -18,6 +20,7 @@ const persistConfig = {
 
 const rootReducer = combineReducers({
   tasks: tasksReducer,
+  notificationSettings: notificationSettingsReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

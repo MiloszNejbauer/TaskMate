@@ -33,6 +33,12 @@ export default function HomeScreen() {
   const [hasDeadline, setHasDeadline] = useState(true);
   const [hasTime, setHasTime] = useState(true);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const {
+    notificationsEnabled,
+    notifyHourBefore,
+    notifyDayBefore
+  } = useSelector((state: RootState) => state.notificationSettings);
+
 
   const theme = useColorScheme() ?? 'light';
   const styles = getGlobalStyles(theme).home;
@@ -95,8 +101,8 @@ export default function HomeScreen() {
     if (!newTask.trim()) return;
 
     if (!hasTime && deadline) {
-  deadline.setHours(23, 59, 59, 999);
-}
+      deadline.setHours(23, 59, 59, 999);
+    }
 
 
     const taskId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -116,22 +122,51 @@ export default function HomeScreen() {
       console.error("Błąd przy dispatch(addTask):", error);
     }
     if (
-      hasDeadline &&
+      notificationsEnabled &&
       Platform.OS !== 'web' &&
       deadline &&
       deadline > new Date()
     ) {
-      const secondsUntilDeadline = Math.floor((deadline.getTime() - Date.now()) / 1000);
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Deadline zadania!',
-          body: `Zadanie: "${newTask}" ma teraz termin!`,
-        },
-        trigger: {
-          seconds: secondsUntilDeadline,
-          channelId: 'default',
-        },
+      const triggers = [];
+
+      if (notifyHourBefore) {
+        const hourBefore = new Date(deadline.getTime() - 60 * 60 * 1000);
+        if (hourBefore > new Date()) {
+          triggers.push({
+            seconds: Math.floor((hourBefore.getTime() - Date.now()) / 1000),
+            body: `Zadanie "${newTask}" kończy się za godzinę!`,
+          });
+        }
+      }
+
+      if (notifyDayBefore) {
+        const dayBefore = new Date(deadline.getTime() - 24 * 60 * 60 * 1000);
+        if (dayBefore > new Date()) {
+          triggers.push({
+            seconds: Math.floor((dayBefore.getTime() - Date.now()) / 1000),
+            body: `Zadanie "${newTask}" kończy się jutro!`,
+          });
+        }
+      }
+
+      // zawsze powiadomienie dokładnie w terminie
+      triggers.push({
+        seconds: Math.floor((deadline.getTime() - Date.now()) / 1000),
+        body: `Zadanie "${newTask}" ma teraz deadline!`,
       });
+
+      for (const trigger of triggers) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Przypomnienie',
+            body: trigger.body,
+          },
+          trigger: {
+            seconds: trigger.seconds,
+            channelId: 'default',
+          },
+        });
+      }
     }
 
     setNewTask('');
@@ -262,11 +297,11 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <Text style={[styles.datetimeText, !deadline && { color: 'red' }]}>
-             {deadline
-  ? hasTime
-    ? deadline.toLocaleString()
-    : deadline.toLocaleDateString()
-  : 'Wybierz datę'}
+              {deadline
+                ? hasTime
+                  ? deadline.toLocaleString()
+                  : deadline.toLocaleDateString()
+                : 'Wybierz datę'}
 
             </Text>
           </View>
