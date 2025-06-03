@@ -67,13 +67,6 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Inne</Text>
-        <TouchableOpacity style={styles.optionButton}>
-          <Text style={styles.optionLabel}>🔁 Resetuj dane (wkrótce) </Text>
-        </TouchableOpacity>
-
-      </View>
     </SafeAreaView>
   );
 }
