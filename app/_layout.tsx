@@ -9,7 +9,6 @@ import ConnectionStatusBanner from '@/components/ConnectionStatusBanner';
 // Ustaw globalny handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,

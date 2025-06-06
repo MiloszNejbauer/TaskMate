@@ -1,3 +1,5 @@
+// index.tsx (po zmianach)
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -23,8 +25,6 @@ import { FontAwesome } from '@expo/vector-icons';
 import type { AppDispatch } from '../../redux/store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-
-
 export default function HomeScreen() {
   const [newTask, setNewTask] = useState('');
   const [deadline, setDeadline] = useState<Date | undefined>(undefined);
@@ -36,17 +36,14 @@ export default function HomeScreen() {
   const {
     notificationsEnabled,
     notifyHourBefore,
-    notifyDayBefore
+    notifyDayBefore,
   } = useSelector((state: RootState) => state.notificationSettings);
-
 
   const theme = useColorScheme() ?? 'light';
   const styles = getGlobalStyles(theme).home;
 
-
   const dispatch = useDispatch<AppDispatch>();
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
-
 
   const currentDate = new Date();
   const todayStart = new Date();
@@ -54,12 +51,10 @@ export default function HomeScreen() {
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 
-  // Przypięte
   const pinned = tasks
     .filter(t => t.pinned)
     .sort((a, b) => new Date(a.deadline ?? 0).getTime() - new Date(b.deadline ?? 0).getTime());
 
-  // Dzisiejsze
   const today = tasks
     .filter(t =>
       t.deadline &&
@@ -69,26 +64,20 @@ export default function HomeScreen() {
     )
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
 
-  // Przyszłe
   const upcoming = tasks
     .filter(t => t.deadline && !t.pinned && new Date(t.deadline) > todayEnd)
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
 
-  // Przeszłe
   const past = tasks
     .filter(t => t.deadline && !t.pinned && new Date(t.deadline) < todayStart)
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
+    .sort((a, b) => new Date(b.deadline!).getTime() - new Date(a.deadline!).getTime());
 
-  // Bez Deadlinu
   const noDeadline = tasks
     .filter(t => !t.deadline && !t.pinned)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-
-
   usePushPermissions();
 
-  // Odświeżanie co 1 sek.
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
@@ -104,8 +93,6 @@ export default function HomeScreen() {
       deadline.setHours(23, 59, 59, 999);
     }
 
-
-    const taskId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const isoDeadline = hasDeadline && deadline ? deadline.toISOString() : undefined;
 
     try {
@@ -113,47 +100,41 @@ export default function HomeScreen() {
         title: newTask,
         deadline: isoDeadline,
       }));
-
-      console.log("Po dispatchu", store.getState()); // <- to się nie pokazuje? ważne
-
-
-      console.log("Po dodaniu:", store.getState());
     } catch (error) {
       console.error("Błąd przy dispatch(addTask):", error);
     }
+
     if (
       notificationsEnabled &&
       Platform.OS !== 'web' &&
       deadline &&
       deadline > new Date()
     ) {
-      const triggers = [];
+      const now = new Date();
+      const triggers: { seconds: number; body: string }[] = [];
+
+
+      const addNotification = (targetTime: Date, message: string) => {
+        const seconds = Math.floor((targetTime.getTime() - now.getTime()) / 1000);
+        if (seconds > 10) {
+          console.log(`🔔 Zaplanowano: "${message}" za ${seconds} sekund`);
+          triggers.push({ seconds, body: message });
+        } else {
+          console.warn(`⚠️ Pominięto powiadomienie "${message}" (za ${seconds}s) — zbyt wcześnie.`);
+        }
+      };
 
       if (notifyHourBefore) {
         const hourBefore = new Date(deadline.getTime() - 60 * 60 * 1000);
-        if (hourBefore > new Date()) {
-          triggers.push({
-            seconds: Math.floor((hourBefore.getTime() - Date.now()) / 1000),
-            body: `Zadanie "${newTask}" kończy się za godzinę!`,
-          });
-        }
+        addNotification(hourBefore, `Zadanie "${newTask}" kończy się za godzinę!`);
       }
 
       if (notifyDayBefore) {
         const dayBefore = new Date(deadline.getTime() - 24 * 60 * 60 * 1000);
-        if (dayBefore > new Date()) {
-          triggers.push({
-            seconds: Math.floor((dayBefore.getTime() - Date.now()) / 1000),
-            body: `Zadanie "${newTask}" kończy się jutro!`,
-          });
-        }
+        addNotification(dayBefore, `Zadanie "${newTask}" kończy się jutro!`);
       }
 
-      // zawsze powiadomienie dokładnie w terminie
-      triggers.push({
-        seconds: Math.floor((deadline.getTime() - Date.now()) / 1000),
-        body: `Zadanie "${newTask}" ma teraz deadline!`,
-      });
+      addNotification(deadline, `Zadanie "${newTask}" ma teraz deadline!`);
 
       for (const trigger of triggers) {
         await Notifications.scheduleNotificationAsync({
@@ -171,9 +152,8 @@ export default function HomeScreen() {
 
     setNewTask('');
     setDeadline(undefined);
-    setHasDeadline(true); // reset do wartości domyślnej
+    setHasDeadline(true);
   };
-
 
   const handleChangeDate = (_: any, selectedDate?: Date) => {
     setShowPicker(false);
@@ -196,7 +176,6 @@ export default function HomeScreen() {
     <>
       {data.length > 0 && <Text style={styles.sectionTitle}>{title}</Text>}
       {data.map(item => {
-        // 🔧 poprawne miejsce inicjalizacji animated value
         if (!pinScales[item.id]) {
           pinScales[item.id] = new Animated.Value(1);
         }
@@ -230,7 +209,6 @@ export default function HomeScreen() {
               })()}
             />
 
-            {/* 🎯 animowana gwiazdka */}
             <TouchableOpacity
               onPress={() => {
                 Animated.sequence([
@@ -264,8 +242,6 @@ export default function HomeScreen() {
     </>
   );
 
-
-
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>TaskMate</Text>
@@ -281,13 +257,8 @@ export default function HomeScreen() {
 
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>Zadanie z deadlinem:</Text>
-        <Switch
-          value={hasDeadline}
-          onValueChange={setHasDeadline}
-        />
-
+        <Switch value={hasDeadline} onValueChange={setHasDeadline} />
       </View>
-
 
       {hasDeadline && (
         <>
@@ -302,7 +273,6 @@ export default function HomeScreen() {
                   ? deadline.toLocaleString()
                   : deadline.toLocaleDateString()
                 : 'Wybierz datę'}
-
             </Text>
           </View>
 
@@ -312,7 +282,6 @@ export default function HomeScreen() {
             </View>
           ) : (
             <>
-              {/* Picker daty */}
               {showPicker && (
                 <DateTimePicker
                   value={deadline || new Date()}
@@ -331,7 +300,6 @@ export default function HomeScreen() {
                 />
               )}
 
-              {/* Picker godziny jeśli aktywny */}
               {hasTime && showTimePicker && (
                 <DateTimePicker
                   value={deadline || new Date()}
@@ -349,7 +317,6 @@ export default function HomeScreen() {
               )}
             </>
           )}
-
         </>
       )}
 
@@ -375,11 +342,9 @@ export default function HomeScreen() {
         </TouchableOpacity>
       )}
 
-
       <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
         <Text style={styles.addButtonText}>➕ Dodaj zadanie</Text>
       </TouchableOpacity>
-
 
       <ScrollView style={styles.container}>
         {renderSection('📌 Ważne', pinned)}
@@ -388,7 +353,6 @@ export default function HomeScreen() {
         {renderSection('🕓 Przeszłe', past)}
         {renderSection("Bez deadline'u", noDeadline)}
       </ScrollView>
-
     </SafeAreaView>
   );
 }
