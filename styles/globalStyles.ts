@@ -242,6 +242,35 @@ export const getGlobalStyles = (theme: 'light' | 'dark') => {
         borderTopWidth: 0.5,
         borderTopColor: colors.border,
       },
-    })
+    }),
+
+    pickers: StyleSheet.create({
+      overlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+      },
+      modal: {
+        padding: 20,
+        borderRadius: 10,
+        elevation: 5,
+        minWidth: 320,
+        maxWidth: 380,
+        alignSelf: 'center',
+        overflow: 'hidden',
+      },
+
+      confirmRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginBottom: 8,
+      },
+      confirmText: {
+        fontWeight: 'bold',
+        fontSize: 16,
+      },
+    }),
+
   };
 };

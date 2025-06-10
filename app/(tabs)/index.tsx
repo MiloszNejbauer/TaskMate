@@ -8,6 +8,9 @@ import {
   ScrollView,
   Switch,
   Animated,
+  Keyboard,
+  TouchableWithoutFeedback,
+  Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSelector, useDispatch } from 'react-redux';
@@ -36,43 +39,28 @@ export default function HomeScreen() {
     notifyHourBefore,
     notifyDayBefore,
   } = useSelector((state: RootState) => state.notificationSettings);
+  const [tempTime, setTempTime] = useState<Date | null>(null);
+
 
   const theme = useColorScheme() ?? 'light';
   const styles = getGlobalStyles(theme).home;
+  const colors = getGlobalStyles(theme); // access colors from style config
+  const pickerStyles = getGlobalStyles(theme).pickers;
+
 
   const dispatch = useDispatch<AppDispatch>();
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
 
-  const currentDate = new Date();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 
-  const pinned = tasks
-    .filter(t => t.pinned)
-    .sort((a, b) => new Date(a.deadline ?? 0).getTime() - new Date(b.deadline ?? 0).getTime());
-
-  const today = tasks
-    .filter(t =>
-      t.deadline &&
-      !t.pinned &&
-      new Date(t.deadline) >= todayStart &&
-      new Date(t.deadline) <= todayEnd
-    )
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
-
-  const upcoming = tasks
-    .filter(t => t.deadline && !t.pinned && new Date(t.deadline) > todayEnd)
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
-
-  const past = tasks
-    .filter(t => t.deadline && !t.pinned && new Date(t.deadline) < todayStart)
-    .sort((a, b) => new Date(b.deadline!).getTime() - new Date(a.deadline!).getTime());
-
-  const noDeadline = tasks
-    .filter(t => !t.deadline && !t.pinned)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const pinned = tasks.filter(t => t.pinned).sort((a, b) => new Date(a.deadline ?? 0).getTime() - new Date(b.deadline ?? 0).getTime());
+  const today = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) >= todayStart && new Date(t.deadline) <= todayEnd).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
+  const upcoming = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) > todayEnd).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
+  const past = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) < todayStart).sort((a, b) => new Date(b.deadline!).getTime() - new Date(a.deadline!).getTime());
+  const noDeadline = tasks.filter(t => !t.deadline && !t.pinned).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   usePushPermissions();
 
@@ -84,54 +72,25 @@ export default function HomeScreen() {
   }, []);
 
   const handleAddTask = async () => {
-    console.log("dodawanie zadania");
     if (!newTask.trim()) return;
 
-    if (!hasTime && deadline) {
-      deadline.setHours(23, 59, 59, 999);
-    }
+    if (!hasTime && deadline) deadline.setHours(23, 59, 59, 999);
 
     const isoDeadline = hasDeadline && deadline ? deadline.toISOString() : undefined;
+    dispatch(addTask({ title: newTask, deadline: isoDeadline }));
 
-    try {
-      dispatch(addTask({
-        title: newTask,
-        deadline: isoDeadline,
-      }));
-    } catch (error) {
-      console.error("Błąd przy dispatch(addTask):", error);
-    }
-
-    if (
-      notificationsEnabled &&
-      Platform.OS !== 'web' &&
-      deadline &&
-      deadline > new Date()
-    ) {
+    if (notificationsEnabled && Platform.OS !== 'web' && deadline && deadline > new Date()) {
       const now = new Date();
       const triggers: { time: Date; body: string }[] = [];
 
-
       const addNotification = (targetTime: Date, message: string) => {
-        if (targetTime.getTime() > now.getTime() + 10 * 1000) {
+        if (targetTime.getTime() > now.getTime() + 10000) {
           triggers.push({ time: targetTime, body: message });
-          console.log(`🔔 Zaplanowano: "${message}" o ${targetTime.toLocaleString()}`);
-        } else {
-          console.warn(`⚠️ Pominięto powiadomienie "${message}" (${targetTime.toLocaleString()}) — zbyt wcześnie.`);
         }
       };
 
-
-      if (notifyHourBefore) {
-        const hourBefore = new Date(deadline.getTime() - 60 * 60 * 1000);
-        addNotification(hourBefore, `Zadanie "${newTask}" kończy się za godzinę!`);
-      }
-
-      if (notifyDayBefore) {
-        const dayBefore = new Date(deadline.getTime() - 24 * 60 * 60 * 1000);
-        addNotification(dayBefore, `Zadanie "${newTask}" kończy się jutro!`);
-      }
-
+      if (notifyHourBefore) addNotification(new Date(deadline.getTime() - 3600000), `Zadanie "${newTask}" kończy się za godzinę!`);
+      if (notifyDayBefore) addNotification(new Date(deadline.getTime() - 86400000), `Zadanie "${newTask}" kończy się jutro!`);
       addNotification(deadline, `Zadanie "${newTask}" ma teraz deadline!`);
 
       for (const trigger of triggers) {
@@ -139,7 +98,6 @@ export default function HomeScreen() {
           content: { title: 'Przypomnienie', body: trigger.body },
           trigger: trigger.time as unknown as Notifications.NotificationTriggerInput,
         });
-
       }
     }
 
@@ -148,30 +106,13 @@ export default function HomeScreen() {
     setHasDeadline(true);
   };
 
-  const handleChangeDate = (_: any, selectedDate?: Date) => {
-    setShowPicker(false);
-    if (selectedDate) setDeadline(selectedDate);
-  };
-
-  const formatForInput = (date: Date) => {
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const yyyy = date.getFullYear();
-    const mm = pad(date.getMonth() + 1);
-    const dd = pad(date.getDate());
-    const hh = pad(date.getHours());
-    const min = pad(date.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-  };
-
   const pinScales = useRef<{ [key: string]: Animated.Value }>({}).current;
 
   const renderSection = (title: string, data: Task[]) => (
     <>
       {data.length > 0 && <Text style={styles.sectionTitle}>{title}</Text>}
       {data.map(item => {
-        if (!pinScales[item.id]) {
-          pinScales[item.id] = new Animated.Value(1);
-        }
+        if (!pinScales[item.id]) pinScales[item.id] = new Animated.Value(1);
 
         return (
           <TouchableOpacity
@@ -180,53 +121,18 @@ export default function HomeScreen() {
             onPress={() => dispatch(toggleTask(item.id))}
             onLongPress={() => dispatch(removeTask(item.id))}
           >
-            <Text style={[styles.taskText, item.done && styles.taskDone]}>
-              {item.title}
-            </Text>
-
-            {item.deadline && (
-              <Text style={styles.deadline}>
-                🕒 {new Date(item.deadline).toLocaleString()}
-              </Text>
-            )}
-
-            <ProgressBar
-              progress={(() => {
-                const created = new Date(item.createdAt).getTime();
-                const end = new Date(item.deadline!).getTime();
-                const nowTime = now;
-
-                if (end <= created) return 1;
-                const ratio = (nowTime - created) / (end - created);
-                return Math.min(Math.max(ratio, 0), 1);
-              })()}
-            />
-
-            <TouchableOpacity
-              onPress={() => {
-                Animated.sequence([
-                  Animated.timing(pinScales[item.id], {
-                    toValue: 1.4,
-                    duration: 150,
-                    useNativeDriver: true,
-                  }),
-                  Animated.timing(pinScales[item.id], {
-                    toValue: 1,
-                    duration: 150,
-                    useNativeDriver: true,
-                  }),
-                ]).start();
-
-                dispatch(togglePin(item.id));
-              }}
-              style={styles.pinButton}
-            >
+            <Text style={[styles.taskText, item.done && styles.taskDone]}>{item.title}</Text>
+            {item.deadline && <Text style={styles.deadline}>🕒 {new Date(item.deadline).toLocaleString()}</Text>}
+            <ProgressBar progress={(now - new Date(item.createdAt).getTime()) / (new Date(item.deadline!).getTime() - new Date(item.createdAt).getTime())} />
+            <TouchableOpacity onPress={() => {
+              Animated.sequence([
+                Animated.timing(pinScales[item.id], { toValue: 1.4, duration: 150, useNativeDriver: true }),
+                Animated.timing(pinScales[item.id], { toValue: 1, duration: 150, useNativeDriver: true }),
+              ]).start();
+              dispatch(togglePin(item.id));
+            }} style={styles.pinButton}>
               <Animated.View style={{ transform: [{ scale: pinScales[item.id] }] }}>
-                <FontAwesome
-                  name={item.pinned ? 'star' : 'star-o'}
-                  size={24}
-                  color={item.pinned ? '#f1c40f' : '#999'}
-                />
+                <FontAwesome name={item.pinned ? 'star' : 'star-o'} size={24} color={item.pinned ? '#f1c40f' : '#999'} />
               </Animated.View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -236,116 +142,152 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>TaskMate</Text>
+    <TouchableWithoutFeedback onPress={() => {
+      Keyboard.dismiss();
+      setShowPicker(false);
+      setShowTimePicker(false);
+    }}>
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.title}>TaskMate</Text>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          placeholder="Dodaj nowe zadanie"
-          value={newTask}
-          onChangeText={setNewTask}
-          style={styles.input}
-        />
-      </View>
-
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Zadanie z deadlinem:</Text>
-        <Switch value={hasDeadline} onValueChange={setHasDeadline} />
-      </View>
-
-      {hasDeadline && (
-        <>
-          <View style={styles.datetimeRow}>
-            <TouchableOpacity style={styles.deadlineButton} onPress={() => setShowPicker(true)}>
-              <Text style={styles.deadlineButtonText}>🕒 Ustaw deadline</Text>
-            </TouchableOpacity>
-
-            <Text style={[styles.datetimeText, !deadline && { color: 'red' }]}>
-              {deadline
-                ? hasTime
-                  ? deadline.toLocaleString()
-                  : deadline.toLocaleDateString()
-                : 'Wybierz datę'}
-            </Text>
-          </View>
-
-          {Platform.OS === 'web' ? (
-            <View style={styles.webPickerContainer}>
-              <WebDatePicker deadline={deadline} setDeadline={setDeadline} />
-            </View>
-          ) : (
-            <>
-              {showPicker && (
-                <DateTimePicker
-                  value={deadline || new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                  onChange={(event, selectedDate) => {
-                    setShowPicker(false);
-                    if (selectedDate) {
-                      const updated = new Date(selectedDate);
-                      if (deadline && hasTime) {
-                        updated.setHours(deadline.getHours(), deadline.getMinutes());
-                      }
-                      setDeadline(updated);
-                    }
-                  }}
-                />
-              )}
-
-              {hasTime && showTimePicker && (
-                <DateTimePicker
-                  value={deadline || new Date()}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event, selectedTime) => {
-                    setShowTimePicker(false);
-                    if (selectedTime && deadline) {
-                      const updated = new Date(deadline);
-                      updated.setHours(selectedTime.getHours(), selectedTime.getMinutes());
-                      setDeadline(updated);
-                    }
-                  }}
-                />
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {hasDeadline && (
-        <View style={styles.toggleRow}>
-          <Text style={{ fontSize: 14, color: styles.taskText.color }}>
-            Zadanie z godziną:
-          </Text>
-          <Switch value={hasTime} onValueChange={setHasTime} />
+        <View style={styles.inputContainer}>
+          <TextInput placeholder="Dodaj nowe zadanie" value={newTask} onChangeText={setNewTask} style={styles.input} />
         </View>
-      )}
 
-      {hasTime && hasDeadline && (
-        <TouchableOpacity
-          onPress={() => setShowTimePicker(true)}
-          style={styles.deadlineButton}
-        >
-          <Text style={styles.deadlineButtonText}>
-            {deadline
-              ? `Godzina: ${deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-              : 'Ustaw godzinę'}
-          </Text>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>Zadanie z deadlinem:</Text>
+          <Switch value={hasDeadline} onValueChange={setHasDeadline} />
+        </View>
+
+        {hasDeadline && (
+          <>
+            <View style={styles.datetimeRow}>
+              <TouchableOpacity
+                style={styles.deadlineButton}
+                onPress={() => {
+                  if (!deadline) {
+                    const now = new Date();
+                    if (!hasTime) now.setHours(23, 59, 59, 999);
+                    setDeadline(now);
+                  }
+                  setShowPicker(prev => !prev); // toggle
+                }}
+              >
+
+                <Text style={styles.deadlineButtonText}>🕒 Ustaw deadline</Text>
+              </TouchableOpacity>
+              <Text style={[styles.datetimeText, !deadline && { color: 'red' }]}> {deadline ? (hasTime ? deadline.toLocaleString() : deadline.toLocaleDateString()) : 'Wybierz datę'} </Text>
+            </View>
+
+            {Platform.OS === 'web' ? (
+              <View style={styles.webPickerContainer}>
+                <WebDatePicker deadline={deadline} setDeadline={setDeadline} />
+              </View>
+            ) : null}
+
+            <View style={styles.toggleRow}>
+              <Text style={{ fontSize: 14, color: styles.taskText.color }}>Zadanie z godziną:</Text>
+              <Switch value={hasTime} onValueChange={setHasTime} />
+            </View>
+
+            {hasTime && (
+              <TouchableOpacity onPress={() => {
+                if (!deadline) setDeadline(new Date());
+                setTempTime(deadline || new Date());
+                setShowTimePicker(true);
+              }}
+                style={styles.deadlineButton}>
+                <Text style={styles.deadlineButtonText}>
+                  {deadline ? `Godzina: ${deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Ustaw godzinę'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
+        <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
+          <Text style={styles.addButtonText}>➕ Dodaj zadanie</Text>
         </TouchableOpacity>
-      )}
 
-      <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
-        <Text style={styles.addButtonText}>➕ Dodaj zadanie</Text>
-      </TouchableOpacity>
+        <ScrollView style={styles.container}>
+          {renderSection('📌 Ważne', pinned)}
+          {renderSection('📅 Dzisiejsze', today)}
+          {renderSection('⏳ Nadchodzące', upcoming)}
+          {renderSection('🕓 Przeszłe', past)}
+          {renderSection("Bez deadline'u", noDeadline)}
+        </ScrollView>
 
-      <ScrollView style={styles.container}>
-        {renderSection('📌 Ważne', pinned)}
-        {renderSection('📅 Dzisiejsze', today)}
-        {renderSection('⏳ Nadchodzące', upcoming)}
-        {renderSection('🕓 Przeszłe', past)}
-        {renderSection("Bez deadline'u", noDeadline)}
-      </ScrollView>
-    </SafeAreaView>
+        {/* Modalne pickery */}
+        {(showPicker || showTimePicker) && Platform.OS !== 'web' && (
+          <Modal transparent animationType="fade" visible>
+            <TouchableWithoutFeedback onPress={() => { setShowPicker(false); setShowTimePicker(false); }}>
+              <View style={pickerStyles.overlay}>
+                <TouchableWithoutFeedback>
+                  <View style={[
+                    pickerStyles.modal,
+                    { backgroundColor: styles.container.backgroundColor }
+                  ]}>
+                    {showPicker && (
+                      <DateTimePicker
+                        value={deadline || new Date()}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                        onChange={(event, selectedDate) => {
+                          if (event.type === 'set' && selectedDate) {
+                            const updated = new Date(selectedDate);
+                            if (deadline && hasTime) {
+                              updated.setHours(deadline.getHours(), deadline.getMinutes());
+                            }
+                            setDeadline(updated);
+                          }
+                          setShowPicker(false);
+                        }}
+                        themeVariant={theme}
+                      />
+                    )}
+
+                    {showTimePicker && (
+                      <>
+                        <View style={pickerStyles.confirmRow}>
+                          <TouchableOpacity onPress={() => {
+                            if (tempTime && deadline) {
+                              const updated = new Date(deadline);
+                              updated.setHours(tempTime.getHours(), tempTime.getMinutes());
+                              setDeadline(updated);
+                            }
+                            setShowTimePicker(false);
+                            setTempTime(null);
+                          }}>
+                            <Text style={[
+                              pickerStyles.confirmText,
+                              { color: styles.addButton.backgroundColor }
+                            ]}>
+                              Zatwierdź
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <DateTimePicker
+                          value={tempTime || deadline || new Date()}
+                          mode="time"
+                          display="spinner"
+                          onChange={(event, selectedTime) => {
+                            if (event.type === 'set' && selectedTime) {
+                              setTempTime(selectedTime);
+                            }
+                          }}
+                          themeVariant={theme}
+                        />
+                      </>
+                    )}
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+        )}
+
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
