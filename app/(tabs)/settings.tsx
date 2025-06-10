@@ -3,7 +3,6 @@ import { View, Text, Switch, Button, StyleSheet, Alert, TouchableOpacity } from 
 import { useNavigation, router } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../redux/store';
-// możesz dodać ustawienia do Redux w przyszłości
 import { getGlobalStyles } from '@/styles/globalStyles';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SafeAreaView } from 'react-native-safe-area-context';

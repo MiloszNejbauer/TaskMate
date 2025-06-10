@@ -1,5 +1,3 @@
-// index.tsx (po zmianach)
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -111,18 +109,18 @@ export default function HomeScreen() {
       deadline > new Date()
     ) {
       const now = new Date();
-      const triggers: { seconds: number; body: string }[] = [];
+      const triggers: { time: Date; body: string }[] = [];
 
 
       const addNotification = (targetTime: Date, message: string) => {
-        const seconds = Math.floor((targetTime.getTime() - now.getTime()) / 1000);
-        if (seconds > 10) {
-          console.log(`🔔 Zaplanowano: "${message}" za ${seconds} sekund`);
-          triggers.push({ seconds, body: message });
+        if (targetTime.getTime() > now.getTime() + 10 * 1000) {
+          triggers.push({ time: targetTime, body: message });
+          console.log(`🔔 Zaplanowano: "${message}" o ${targetTime.toLocaleString()}`);
         } else {
-          console.warn(`⚠️ Pominięto powiadomienie "${message}" (za ${seconds}s) — zbyt wcześnie.`);
+          console.warn(`⚠️ Pominięto powiadomienie "${message}" (${targetTime.toLocaleString()}) — zbyt wcześnie.`);
         }
       };
+
 
       if (notifyHourBefore) {
         const hourBefore = new Date(deadline.getTime() - 60 * 60 * 1000);
@@ -138,15 +136,10 @@ export default function HomeScreen() {
 
       for (const trigger of triggers) {
         await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Przypomnienie',
-            body: trigger.body,
-          },
-          trigger: {
-            seconds: trigger.seconds,
-            channelId: 'default',
-          },
+          content: { title: 'Przypomnienie', body: trigger.body },
+          trigger: trigger.time as unknown as Notifications.NotificationTriggerInput,
         });
+
       }
     }
 
