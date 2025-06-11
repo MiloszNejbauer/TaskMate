@@ -1,4 +1,3 @@
-// Importy niezbędnych bibliotek i komponentów
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Platform, ScrollView,
@@ -158,7 +157,7 @@ export default function HomeScreen() {
         {/* Tytuł aplikacji */}
         <Text style={styles.title}>TaskMate</Text>
 
-        {/*Przycisk otwierający form tworzenia zadania */}
+        {/* Przycisk otwierający form tworzenia zadania */}
         {!showForm && (
           <TouchableOpacity
             style={styles.addButton}
@@ -241,7 +240,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </>
         )}
-
 
         {/* Lista zadań w scrollview */}
         <ScrollView style={styles.container}>
