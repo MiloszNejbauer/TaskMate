@@ -1,69 +1,75 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, Platform, ScrollView,
-  Switch, Animated, Keyboard, TouchableWithoutFeedback, Modal,
-} from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, store } from '../../redux/store';
-import { addTask, toggleTask, removeTask, togglePin, Task } from '../../redux/tasksSlice';
-import { usePushPermissions } from '@/hooks/usePushPermissions';
+import { FontAwesome } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Keyboard,
+  Platform,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+
+import ProgressBar from '@/components/TaskProgressBar';
 import WebDatePicker from '@/components/WebDatePicker';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { usePushPermissions } from '@/hooks/usePushPermissions';
 import { getGlobalStyles } from '@/styles/globalStyles';
-import ProgressBar from '@/components/TaskProgressBar';
-import { FontAwesome } from '@expo/vector-icons';
 import type { AppDispatch } from '../../redux/store';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { RootState } from '../../redux/store';
+import {
+  addTask,
+  removeTask,
+  Task,
+  togglePin,
+  toggleTask,
+} from '../../redux/tasksSlice';
 
 export default function HomeScreen() {
-  // Lokalny stan komponentu
   const [newTask, setNewTask] = useState('');
   const [deadline, setDeadline] = useState<Date | undefined>(undefined);
-  const [showPicker, setShowPicker] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const [hasDeadline, setHasDeadline] = useState(true);
   const [hasTime, setHasTime] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [tempTime, setTempTime] = useState<Date | null>(null);
+  const [now, setNow] = useState(Date.now());
   const [showForm, setShowForm] = useState(false);
+  
 
-
-  // Ustawienia powiadomień z reduxa
   const {
     notificationsEnabled,
     notifyHourBefore,
     notifyDayBefore,
   } = useSelector((state: RootState) => state.notificationSettings);
 
-  // Styl i kolorystyka na podstawie motywu (ciemny/jasny)
   const theme = useColorScheme() ?? 'light';
   const styles = getGlobalStyles(theme).home;
-  const colors = getGlobalStyles(theme);
-  const pickerStyles = getGlobalStyles(theme).pickers;
-
-  // Dostęp do dispatcha i listy zadań
   const dispatch = useDispatch<AppDispatch>();
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
 
-  // Ustawienia czasowe do filtrowania zadań wg daty
+  const initialDate = useRef(new Date()).current;
+
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 
-  // Filtrowanie zadań wg kategorii
   const pinned = tasks.filter(t => t.pinned).sort((a, b) => new Date(a.deadline ?? 0).getTime() - new Date(b.deadline ?? 0).getTime());
   const today = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) >= todayStart && new Date(t.deadline) <= todayEnd).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
   const upcoming = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) > todayEnd).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
   const past = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) < todayStart).sort((a, b) => new Date(b.deadline!).getTime() - new Date(a.deadline!).getTime());
   const noDeadline = tasks.filter(t => !t.deadline && !t.pinned).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  // Ustawienia uprawnień do powiadomień
   usePushPermissions();
 
-  // Odświeżanie czasu co sekundę
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
@@ -71,7 +77,6 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Obsługa dodawania zadania
   const handleAddTask = async () => {
     if (!newTask.trim()) return;
 
@@ -80,7 +85,6 @@ export default function HomeScreen() {
     const isoDeadline = hasDeadline && deadline ? deadline.toISOString() : undefined;
     dispatch(addTask({ title: newTask, deadline: isoDeadline }));
 
-    // Powiadomienia lokalne
     if (notificationsEnabled && Platform.OS !== 'web' && deadline && deadline > new Date()) {
       const now = new Date();
       const triggers: { time: Date; body: string }[] = [];
@@ -103,17 +107,14 @@ export default function HomeScreen() {
       }
     }
 
-    // Resetowanie stanu po dodaniu
     setNewTask('');
     setDeadline(undefined);
     setHasDeadline(true);
     setShowForm(false);
   };
 
-  // Animacja skalowania gwiazdek (pinów)
   const pinScales = useRef<{ [key: string]: Animated.Value }>({}).current;
 
-  // Renderowanie sekcji zadań wg kategorii
   const renderSection = (title: string, data: Task[]) => (
     <>
       {data.length > 0 && <Text style={styles.sectionTitle}>{title}</Text>}
@@ -148,30 +149,18 @@ export default function HomeScreen() {
   );
 
   return (
-    <TouchableWithoutFeedback onPress={() => {
-      Keyboard.dismiss();
-      setShowPicker(false);
-      setShowTimePicker(false);
-    }}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.container}>
-        {/* Tytuł aplikacji */}
         <Text style={styles.title}>TaskMate</Text>
 
-        {/* Przycisk otwierający form tworzenia zadania */}
         {!showForm && (
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setShowForm(true)}
-          >
+          <TouchableOpacity style={styles.addButton} onPress={() => setShowForm(true)}>
             <Text style={styles.addButtonText}>➕ Dodaj nowe zadanie</Text>
           </TouchableOpacity>
         )}
 
-
-        {/* Pole tekstowe do wpisania nowego zadania */}
         {showForm && (
           <>
-            {/* Pole tekstowe do wpisania nowego zadania */}
             <View style={styles.inputContainer}>
               <TextInput
                 placeholder="Dodaj nowe zadanie"
@@ -181,27 +170,15 @@ export default function HomeScreen() {
               />
             </View>
 
-            {/* Przełącznik deadline'u */}
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>Zadanie z deadlinem:</Text>
               <Switch value={hasDeadline} onValueChange={setHasDeadline} />
             </View>
 
-            {/* Wybór daty i godziny jeśli deadline jest włączony */}
             {hasDeadline && (
               <>
                 <View style={styles.datetimeRow}>
-                  <TouchableOpacity
-                    style={styles.deadlineButton}
-                    onPress={() => {
-                      if (!deadline) {
-                        const now = new Date();
-                        if (!hasTime) now.setHours(23, 59, 59, 999);
-                        setDeadline(now);
-                      }
-                      setShowPicker(prev => !prev);
-                    }}
-                  >
+                  <TouchableOpacity style={styles.deadlineButton} onPress={() => setShowDatePicker(true)}>
                     <Text style={styles.deadlineButtonText}>🕒 Ustaw deadline</Text>
                   </TouchableOpacity>
                   <Text style={[styles.datetimeText, !deadline && { color: 'red' }]}>
@@ -221,11 +198,7 @@ export default function HomeScreen() {
                 </View>
 
                 {hasTime && (
-                  <TouchableOpacity onPress={() => {
-                    if (!deadline) setDeadline(new Date());
-                    setTempTime(deadline || new Date());
-                    setShowTimePicker(true);
-                  }} style={styles.deadlineButton}>
+                  <TouchableOpacity style={styles.deadlineButton} onPress={() => setShowTimePicker(true)}>
                     <Text style={styles.deadlineButtonText}>
                       {deadline ? `Godzina: ${deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Ustaw godzinę'}
                     </Text>
@@ -234,14 +207,12 @@ export default function HomeScreen() {
               </>
             )}
 
-            {/* Przycisk dodania zadania */}
             <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
               <Text style={styles.addButtonText}>✅ Dodaj zadanie</Text>
             </TouchableOpacity>
           </>
         )}
 
-        {/* Lista zadań w scrollview */}
         <ScrollView style={styles.container}>
           {renderSection('📌 Ważne', pinned)}
           {renderSection('📅 Dzisiejsze', today)}
@@ -250,68 +221,45 @@ export default function HomeScreen() {
           {renderSection("Bez deadline'u", noDeadline)}
         </ScrollView>
 
-        {/* Modal z pickerami daty i czasu (tylko native) */}
-        {(showPicker || showTimePicker) && Platform.OS !== 'web' && (
-          <Modal transparent animationType="fade" visible>
-            <TouchableWithoutFeedback onPress={() => { setShowPicker(false); setShowTimePicker(false); }}>
-              <View style={pickerStyles.overlay}>
-                <TouchableWithoutFeedback>
-                  <View style={[pickerStyles.modal, { backgroundColor: styles.container.backgroundColor }]}>
-                    {showPicker && (
-                      <DateTimePicker
-                        value={deadline || new Date()}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                        onChange={(event, selectedDate) => {
-                          if (event.type === 'set' && selectedDate) {
-                            const updated = new Date(selectedDate);
-                            if (deadline && hasTime) {
-                              updated.setHours(deadline.getHours(), deadline.getMinutes());
-                            }
-                            setDeadline(updated);
-                          }
-                          setShowPicker(false);
-                        }}
-                        themeVariant={theme}
-                      />
-                    )}
+        {/* Modal Date Picker */}
+        <DateTimePickerModal
+          isVisible={showDatePicker}
+          mode="date"
+          date={deadline || initialDate}
+          onConfirm={selected => {
+            const updated = new Date(selected);
+            if (hasTime && deadline) {
+              updated.setHours(deadline.getHours(), deadline.getMinutes());
+            }
+            setDeadline(updated);
+            setShowDatePicker(false);
+          }}
+          onCancel={() => setShowDatePicker(false)}
+          themeVariant={theme}
+          confirmTextIOS='zatwierdź'
+          cancelTextIOS='anuluj'
+          pickerStyleIOS={{ alignSelf: 'center' }}
 
-                    {showTimePicker && (
-                      <>
-                        <View style={pickerStyles.confirmRow}>
-                          <TouchableOpacity onPress={() => {
-                            if (tempTime && deadline) {
-                              const updated = new Date(deadline);
-                              updated.setHours(tempTime.getHours(), tempTime.getMinutes());
-                              setDeadline(updated);
-                            }
-                            setShowTimePicker(false);
-                            setTempTime(null);
-                          }}>
-                            <Text style={[pickerStyles.confirmText, { color: styles.addButton.backgroundColor }]}>Zatwierdź</Text>
-                          </TouchableOpacity>
-                        </View>
+        />
 
-                        <DateTimePicker
-                          value={tempTime || deadline || new Date()}
-                          mode="time"
-                          display="spinner"
-                          onChange={(event, selectedTime) => {
-                            if (event.type === 'set' && selectedTime) {
-                              setTempTime(selectedTime);
-                            }
-                          }}
-                          themeVariant={theme}
-                        />
-                      </>
-                    )}
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
-          </Modal>
-        )}
+        {/* Modal Time Picker */}
+        <DateTimePickerModal
+          isVisible={showTimePicker}
+          mode="time"
+          date={deadline ?? new Date()}
+          onConfirm={selected => {
+            const updated = new Date(deadline ?? new Date());
+            updated.setHours(selected.getHours(), selected.getMinutes());
+            setDeadline(updated);
+            setShowTimePicker(false);
+          }}
+          onCancel={() => setShowTimePicker(false)}
+          themeVariant={theme}
+          confirmTextIOS='zatwierdź'
+          cancelTextIOS='anuluj'
+          pickerStyleIOS={{ alignSelf: 'center' }}
 
+        />
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
