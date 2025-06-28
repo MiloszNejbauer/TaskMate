@@ -1,18 +1,18 @@
+import { useColorScheme } from '@/hooks/useColorScheme'; // Hook do wyboru jasny/ciemny motyw
+import { getGlobalStyles } from '@/styles/globalStyles'; // Style zależne od motywu
+import { useRouter } from 'expo-router'; // Nawigacja 
 import React from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
   Alert,
+  FlatList,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router'; // Nawigacja (np. router.back())
-import { useSelector, useDispatch } from 'react-redux'; // Dostęp do stanu Redux
+import { SafeAreaView } from 'react-native-safe-area-context'; // Bezpieczne obszary na telefonach
+import { useDispatch, useSelector } from 'react-redux'; // Dostęp do stanu Redux
 import { RootState } from '../redux/store'; // Typowanie stanu globalnego
 import { clearArchive } from '../redux/tasksSlice'; // Akcja do czyszczenia archiwum
-import { getGlobalStyles } from '@/styles/globalStyles'; // Style zależne od motywu
-import { useColorScheme } from '@/hooks/useColorScheme'; // Hak do wyboru jasny/ciemny motyw
-import { SafeAreaView } from 'react-native-safe-area-context'; // Bezpieczne obszary na telefonach
 
 export default function ArchiveScreen() {
   const router = useRouter(); // Dostęp do nawigacji
@@ -25,7 +25,7 @@ export default function ArchiveScreen() {
   // Pobranie zarchiwizowanych zadań ze stanu Redux
   const archivedTasks = useSelector((state: RootState) => state.tasks.archived);
 
-  // Funkcja czyszcząca archiwum zadań z potwierdzeniem
+  // Funkcja czyszcząca archiwum zadań
   const handleClearArchive = () => {
     if (archivedTasks.length === 0) return;
 

@@ -17,22 +17,23 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 
-import ProgressBar from '@/components/TaskProgressBar';
-import WebDatePicker from '@/components/WebDatePicker';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { usePushPermissions } from '@/hooks/usePushPermissions';
-import { getGlobalStyles } from '@/styles/globalStyles';
-import type { AppDispatch } from '../../redux/store';
-import { RootState } from '../../redux/store';
+import ProgressBar from '@/components/TaskProgressBar'; // Pasek postępu zadania
+import WebDatePicker from '@/components/WebDatePicker'; // Picker dla Weba
+import { useColorScheme } from '@/hooks/useColorScheme'; // Hook do motywu
+import { usePushPermissions } from '@/hooks/usePushPermissions'; // Uprawnienia do powiadomień
+import { getGlobalStyles } from '@/styles/globalStyles'; // Style globalne
+import type { AppDispatch } from '../../redux/store'; // Typ dispatcha
+import { RootState } from '../../redux/store'; // Typ stanu
 import {
   addTask,
   removeTask,
   Task,
   togglePin,
   toggleTask,
-} from '../../redux/tasksSlice';
+} from '../../redux/tasksSlice'; // Akcje i typy zadań
 
 export default function HomeScreen() {
+  // Lokalne stany formularza i daty
   const [newTask, setNewTask] = useState('');
   const [deadline, setDeadline] = useState<Date | undefined>(undefined);
   const [hasDeadline, setHasDeadline] = useState(true);
@@ -41,39 +42,37 @@ export default function HomeScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [showForm, setShowForm] = useState(false);
-  
 
+  // Dane z reduxa
   const {
     notificationsEnabled,
     notifyHourBefore,
     notifyDayBefore,
   } = useSelector((state: RootState) => state.notificationSettings);
+  const tasks = useSelector((state: RootState) => state.tasks.tasks);
+  const dispatch = useDispatch<AppDispatch>();
 
+  // Motyw i style
   const theme = useColorScheme() ?? 'light';
   const styles = getGlobalStyles(theme).home;
-  const dispatch = useDispatch<AppDispatch>();
-  const tasks = useSelector((state: RootState) => state.tasks.tasks);
 
+  // Referencje i daty pomocnicze
   const initialDate = useRef(new Date()).current;
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
 
-
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
-
+  // Kategoryzacja zadań
   const pinned = tasks.filter(t => t.pinned).sort((a, b) => new Date(a.deadline ?? 0).getTime() - new Date(b.deadline ?? 0).getTime());
   const today = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) >= todayStart && new Date(t.deadline) <= todayEnd).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
   const upcoming = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) > todayEnd).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
   const past = tasks.filter(t => t.deadline && !t.pinned && new Date(t.deadline) < todayStart).sort((a, b) => new Date(b.deadline!).getTime() - new Date(a.deadline!).getTime());
   const noDeadline = tasks.filter(t => !t.deadline && !t.pinned).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  usePushPermissions();
+  usePushPermissions(); // Sprawdzenie uprawnień do powiadomień
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
+    // Aktualizacja czasu co 1s (do ProgressBarów)
+    const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -81,10 +80,12 @@ export default function HomeScreen() {
     if (!newTask.trim()) return;
 
     if (!hasTime && deadline) deadline.setHours(23, 59, 59, 999);
-
     const isoDeadline = hasDeadline && deadline ? deadline.toISOString() : undefined;
+
+    // Dodaj nowe zadanie
     dispatch(addTask({ title: newTask, deadline: isoDeadline }));
 
+    // Ustaw powiadomienia
     if (notificationsEnabled && Platform.OS !== 'web' && deadline && deadline > new Date()) {
       const now = new Date();
       const triggers: { time: Date; body: string }[] = [];
@@ -97,7 +98,7 @@ export default function HomeScreen() {
 
       if (notifyHourBefore) addNotification(new Date(deadline.getTime() - 3600000), `Zadanie "${newTask}" kończy się za godzinę!`);
       if (notifyDayBefore) addNotification(new Date(deadline.getTime() - 86400000), `Zadanie "${newTask}" kończy się jutro!`);
-      addNotification(deadline, `Zadanie "${newTask}" ma teraz deadline!`);
+      addNotification(deadline, `Zadanie "${newTask}" kończy się teraz!`);
 
       for (const trigger of triggers) {
         await Notifications.scheduleNotificationAsync({
@@ -107,13 +108,14 @@ export default function HomeScreen() {
       }
     }
 
+    // Reset formularza
     setNewTask('');
     setDeadline(undefined);
     setHasDeadline(true);
     setShowForm(false);
   };
 
-  const pinScales = useRef<{ [key: string]: Animated.Value }>({}).current;
+  const pinScales = useRef<{ [key: string]: Animated.Value }>({}).current; // Animacja ikony przypięcia
 
   const renderSection = (title: string, data: Task[]) => (
     <>
@@ -125,8 +127,8 @@ export default function HomeScreen() {
           <TouchableOpacity
             key={item.id}
             style={[styles.taskItem, item.pinned && styles.pinnedTask]}
-            onPress={() => dispatch(toggleTask(item.id))}
-            onLongPress={() => dispatch(removeTask(item.id))}
+            onPress={() => dispatch(toggleTask(item.id))} // Zmień status ukończenia
+            onLongPress={() => dispatch(removeTask(item.id))} // Usuń zadanie
           >
             <Text style={[styles.taskText, item.done && styles.taskDone]}>{item.title}</Text>
             {item.deadline && <Text style={styles.deadline}>🕒 {new Date(item.deadline).toLocaleString()}</Text>}
@@ -136,7 +138,7 @@ export default function HomeScreen() {
                 Animated.timing(pinScales[item.id], { toValue: 1.4, duration: 150, useNativeDriver: true }),
                 Animated.timing(pinScales[item.id], { toValue: 1, duration: 150, useNativeDriver: true }),
               ]).start();
-              dispatch(togglePin(item.id));
+              dispatch(togglePin(item.id)); // Przypnij lub odepnij
             }} style={styles.pinButton}>
               <Animated.View style={{ transform: [{ scale: pinScales[item.id] }] }}>
                 <FontAwesome name={item.pinned ? 'star' : 'star-o'} size={24} color={item.pinned ? '#f1c40f' : '#999'} />
@@ -153,12 +155,14 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.container}>
         <Text style={styles.title}>TaskMate</Text>
 
+        {/* Przycisk dodawania nowego zadania */}
         {!showForm && (
           <TouchableOpacity style={styles.addButton} onPress={() => setShowForm(true)}>
             <Text style={styles.addButtonText}>➕ Dodaj nowe zadanie</Text>
           </TouchableOpacity>
         )}
 
+        {/* Formularz dodawania zadania */}
         {showForm && (
           <>
             <View style={styles.inputContainer}>
@@ -186,6 +190,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
 
+                {/* Picker dla przeglądarki */}
                 {Platform.OS === 'web' && (
                   <View style={styles.webPickerContainer}>
                     <WebDatePicker deadline={deadline} setDeadline={setDeadline} />
@@ -213,6 +218,7 @@ export default function HomeScreen() {
           </>
         )}
 
+        {/* Sekcje zadań */}
         <ScrollView style={styles.container}>
           {renderSection('📌 Ważne', pinned)}
           {renderSection('📅 Dzisiejsze', today)}
@@ -221,7 +227,7 @@ export default function HomeScreen() {
           {renderSection("Bez deadline'u", noDeadline)}
         </ScrollView>
 
-        {/* Modal Date Picker */}
+        {/* Picker daty */}
         <DateTimePickerModal
           isVisible={showDatePicker}
           mode="date"
@@ -239,10 +245,9 @@ export default function HomeScreen() {
           confirmTextIOS='zatwierdź'
           cancelTextIOS='anuluj'
           pickerStyleIOS={{ alignSelf: 'center' }}
-
         />
 
-        {/* Modal Time Picker */}
+        {/* Picker godziny */}
         <DateTimePickerModal
           isVisible={showTimePicker}
           mode="time"
@@ -258,7 +263,6 @@ export default function HomeScreen() {
           confirmTextIOS='zatwierdź'
           cancelTextIOS='anuluj'
           pickerStyleIOS={{ alignSelf: 'center' }}
-
         />
       </SafeAreaView>
     </TouchableWithoutFeedback>
